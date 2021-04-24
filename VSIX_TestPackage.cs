@@ -1,4 +1,10 @@
-﻿using Microsoft.VisualStudio.Shell;
+﻿using EnvDTE;
+using EnvDTE80;
+using Microsoft;
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
+using NLog;
+using NLog.Config;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -20,18 +26,20 @@ namespace VSIX_Test
     /// utility what data to put into .pkgdef file.
     /// </para>
     /// <para>
-    /// To get loaded into VS, the package must be referred by &lt;Asset Type="Microsoft.VisualStudio.VsPackage" ...&gt; in .vsixmanifest file.
+    /// To get loaded into VS, the package must be referred by <Asset Type="Microsoft.VisualStudio.VsPackage" .../> in .vsixmanifest file.
     /// </para>
     /// </remarks>
     [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-    [Guid(VSIX_TestPackage.PackageGuidString)]
-    [ProvideMenuResource("Menus.ctmenu", 1)]
+    [ProvideAutoLoad(UIContextGuids.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]
+    [Guid(PackageGuidString)]
     public sealed class VSIX_TestPackage : AsyncPackage
     {
         /// <summary>
         /// VSIX_TestPackage GUID string.
         /// </summary>
         public const string PackageGuidString = "9e80e988-de20-4561-b2ff-9c9436df40b1";
+
+        public static Logger logger;
 
         #region Package Members
 
@@ -44,9 +52,26 @@ namespace VSIX_Test
         /// <returns>A task representing the async work of package initialization, or an already completed task if there is none. Do not return null from this method.</returns>
         protected override async Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
         {
-            // When initialized asynchronously, the current thread may be a background thread at this point.
-            // Do any initialization that requires the UI thread after switching to the UI thread.
+            progress.Report(new ServiceProgressData("Configuring NLog..."));
+
+            ConfigureNLog();
+
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
+        }
+
+        private void ConfigureNLog()
+        {
+            ConfigurationItemFactory.Default.Targets.RegisterDefinition("OutputWindow", typeof(LogWindow));
+
+            var config = new LoggingConfiguration();
+            NLog.Targets.AsyncTaskTarget outputWindowTarget = new LogWindow(this);
+            outputWindowTarget.Layout = "${longdate}|${level:uppercase=true}|${callsite:captureStackTrace:False}|${message}|${exception:format=@:innerFormat=@:maxInnerExceptionLevel=1}";
+            
+            config.AddRule(LogLevel.Trace, LogLevel.Fatal, outputWindowTarget);
+
+            LogManager.Configuration = config;
+
+            logger = LogManager.GetLogger("OutputWindow");
         }
 
         #endregion

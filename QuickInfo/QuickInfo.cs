@@ -48,6 +48,8 @@ namespace VSIX_Test
 
         public TestQuickInfoSource(TestQuickInfoSourceProvider provider, ITextBuffer subjectBuffer)
         {
+            VSIX_TestPackage.logger.Info("TestQuickInfoSource");
+
             m_provider = provider;
             m_subjectBuffer = subjectBuffer;
 
